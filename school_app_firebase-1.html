@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>تطبيق التواصل المدرسي</title>
+    <style>
+        * { box-sizing: border-box; font-family: Tahoma, sans-serif; margin: 0; padding: 0; }
+        body { background-color: #f4f6f9; color: #333; padding: 20px; }
+        .container { max-width: 600px; margin: 0 auto; background: #fff; padding: 25px; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        h2 { color: #2c3e50; margin-bottom: 8px; text-align: center; }
+        h3 { margin-bottom: 8px; color: #2c3e50; }
+        .welcome { text-align: center; color: #7f8c8d; margin-bottom: 20px; font-size: 14px; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        input, textarea { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 5px; font-size: 14px; }
+        input[type="email"], input[type="password"] { direction: ltr; text-align: right; }
+        textarea { min-height: 90px; resize: vertical; }
+        button { background: #3498db; color: white; border: none; padding: 10px 15px; border-radius: 5px; cursor: pointer; width: 100%; font-size: 16px; font-weight: bold; margin-top: 10px; }
+        button:hover { background: #2980b9; }
+        button:disabled { opacity: .6; cursor: wait; }
+        :focus-visible { outline: 3px solid #f39c12; outline-offset: 2px; }
+        .link-btn { background: none; color: #2980b9; font-size: 14px; font-weight: normal; text-decoration: underline; }
+        .link-btn:hover { background: none; color: #1c5d8a; }
+        .hidden { display: none; }
+        .card { background: #e8f4fd; padding: 15px; border-radius: 5px; margin-bottom: 15px; border-right: 5px solid #3498db; }
+        .item { background: #fff; border: 1px solid #d6e6f3; border-radius: 5px; padding: 10px; margin-top: 8px; }
+        .item .meta { font-size: 12px; color: #7f8c8d; margin-bottom: 4px; }
+        .item .title { font-weight: bold; }
+        .item .body { white-space: pre-wrap; margin-top: 2px; }
+        .empty { color: #7f8c8d; }
+        .delete-btn { background: #e74c3c; width: auto; padding: 4px 10px; font-size: 12px; margin-top: 8px; }
+        .delete-btn:hover { background: #c0392b; }
+        .reply-btn { background: #27ae60; width: auto; padding: 6px 14px; font-size: 13px; margin-top: 6px; }
+        .reply-btn:hover { background: #1e8449; }
+        .reply { background: #f0f9f0; border-right: 3px solid #27ae60; border-radius: 4px; padding: 8px; margin-top: 8px; }
+        .reply .meta { font-size: 12px; color: #7f8c8d; margin-bottom: 2px; }
+        .reply .body { white-space: pre-wrap; }
+        .badge { display: inline-block; font-size: 12px; padding: 2px 10px; border-radius: 10px; margin-bottom: 6px; }
+        .badge.wait { background: #fdebd0; color: #935116; }
+        .badge.done { background: #d5f5e3; color: #1e8449; }
+        .reply-box { margin-top: 8px; }
+        .reply-box textarea { min-height: 60px; }
+        .logout-btn { background: #e74c3c; margin-top: 20px; }
+        .logout-btn:hover { background: #c0392b; }
+        .setup-note { background: #fff3cd; color: #664d03; padding: 12px; border-radius: 5px; line-height: 1.7; }
+        .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #27ae60; color: #fff; padding: 10px 18px; border-radius: 6px; font-size: 14px; opacity: 0; pointer-events: none; transition: opacity .2s; max-width: 90%; text-align: center; }
+        .toast.show { opacity: 1; }
+        .toast.error { background: #c0392b; }
+    </style>
+</head>
+<body>
+
+    <div class="container" id="app">
+        <!-- تنبيه الإعداد: يظهر إذا لم تُدخل إعدادات Firebase -->
+        <div id="setupScreen" class="hidden">
+            <h2>الإعداد مطلوب</h2>
+            <p class="setup-note">افتح هذا الملف في محرر نصوص، وضع إعدادات مشروع Firebase مكان <b>firebaseConfig</b> في بداية السكربت، ثم أعد فتح الصفحة.</p>
+        </div>
+
+        <!-- شاشة تسجيل الدخول / إنشاء حساب -->
+        <div id="loginScreen" class="hidden">
+            <h2 id="authTitle">تسجيل الدخول - تطبيق المدرسة</h2>
+            <div class="form-group hidden" id="nameGroup">
+                <label for="regName">الاسم:</label>
+                <input type="text" id="regName" autocomplete="name" placeholder="اسم ولي الأمر">
+            </div>
+            <div class="form-group">
+                <label for="email">البريد الإلكتروني:</label>
+                <input type="email" id="email" autocomplete="email" placeholder="name@example.com">
+            </div>
+            <div class="form-group">
+                <label for="password">كلمة المرور:</label>
+                <input type="password" id="password" autocomplete="current-password" placeholder="6 أحرف على الأقل">
+            </div>
+            <button id="authBtn">دخول</button>
+            <button class="link-btn" id="toggleAuth">ولي أمر جديد؟ أنشئ حساباً</button>
+        </div>
+
+        <!-- لوحة تحكم المدير -->
+        <div id="adminScreen" class="hidden">
+            <h2>لوحة تحكم المدير</h2>
+            <p class="welcome" data-welcome></p>
+            <div class="form-group">
+                <label for="adminMsg">إرسال تعميم عام للمدرسة:</label>
+                <textarea id="adminMsg" placeholder="اكتب التعميم هنا..."></textarea>
+            </div>
+            <button id="sendAnnounceBtn">نشر التعميم</button>
+            <div class="card" style="margin-top:20px;">
+                <h3>التعاميم المنشورة:</h3>
+                <div id="adminAnnounceList"></div>
+            </div>
+            <div class="card">
+                <h3>أسئلة أولياء الأمور:</h3>
+                <div id="adminQuestions"></div>
+            </div>
+            <button class="logout-btn" data-logout>تسجيل الخروج</button>
+        </div>
+
+        <!-- لوحة تحكم المعلم -->
+        <div id="teacherScreen" class="hidden">
+            <h2>لوحة تحكم المعلم</h2>
+            <p class="welcome" data-welcome></p>
+            <div class="form-group">
+                <label for="hwTitle">إضافة واجب يومي للفصل:</label>
+                <input type="text" id="hwTitle" placeholder="عنوان الواجب (مثلاً: حل ص 15)">
+                <textarea id="hwDetails" placeholder="تفاصيل الواجب..." style="margin-top: 5px;"></textarea>
+            </div>
+            <button id="sendHwBtn">إرسال الواجب لأولياء الأمور</button>
+            <div class="card" style="margin-top:20px;">
+                <h3>الواجبات المرسلة:</h3>
+                <div id="teacherHwList"></div>
+            </div>
+            <div class="card">
+                <h3>أسئلة أولياء الأمور:</h3>
+                <div id="teacherQuestions"></div>
+            </div>
+            <button class="logout-btn" data-logout>تسجيل الخروج</button>
+        </div>
+
+        <!-- لوحة متابعة ولي الأمر -->
+        <div id="parentScreen" class="hidden">
+            <h2>لوحة متابعة ولي الأمر</h2>
+            <p class="welcome" data-welcome></p>
+            <div class="card">
+                <h3>الواجبات المدرسية المطلوبة:</h3>
+                <div id="parentHw"></div>
+            </div>
+            <div class="card">
+                <h3>إشعارات المدرسة والتعاميم:</h3>
+                <div id="parentAnnounce"></div>
+            </div>
+            <div class="card">
+                <h3>اسأل المدرسة:</h3>
+                <div class="form-group">
+                    <textarea id="qText" placeholder="اكتب سؤالك للمعلم أو الإدارة..."></textarea>
+                </div>
+                <button id="sendQBtn">إرسال السؤال</button>
+            </div>
+            <div class="card">
+                <h3>أسئلتي وردود المدرسة:</h3>
+                <div id="parentQuestions"></div>
+            </div>
+            <button class="logout-btn" data-logout>تسجيل الخروج</button>
+        </div>
+    </div>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+        import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut }
+            from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+        import { getFirestore, doc, getDoc, setDoc, collection, addDoc, deleteDoc, updateDoc, arrayUnion, query, where, orderBy, onSnapshot, serverTimestamp }
+            from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+        // =====================================================
+        // ضع هنا إعدادات مشروعك من Firebase:
+        // Project settings > Your apps > Web app > Config
+        // =====================================================
+        const firebaseConfig = {
+            apiKey: "AIzaSyBa2vpc1Lb7bH0W1HIouBFBOIAR8si0SsA",
+            authDomain: "school-app-249f7.firebaseapp.com",
+            projectId: "school-app-249f7",
+            appId: "1:850580320366:web:2e7fa591a91789a948b67f"
+        };
+
+        const $ = id => document.getElementById(id);
+        const SCREENS = { admin: 'adminScreen', teacher: 'teacherScreen', parent: 'parentScreen' };
+        const ALL_SCREENS = ['setupScreen', 'loginScreen', ...Object.values(SCREENS)];
+        const ROLE_LABELS = { admin: 'الإدارة', teacher: 'المعلم' };
+
+        function show(id) {
+            ALL_SCREENS.forEach(s => $(s).classList.add('hidden'));
+            $(id).classList.remove('hidden');
+        }
+        function showToast(text, isError) {
+            const t = $('toast');
+            t.textContent = text;
+            t.classList.toggle('error', !!isError);
+            t.classList.add('show');
+            clearTimeout(showToast.timer);
+            showToast.timer = setTimeout(() => t.classList.remove('show'), 3000);
+        }
+
+        if (firebaseConfig.apiKey.startsWith('PUT_')) {
+            show('setupScreen');
+            throw new Error('Firebase config is not set');
+        }
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        let profile = null;          // { uid, name, role }
+        let unsubscribers = [];
+        let registerMode = false;
+        let pendingName = null;      // اسم ولي الأمر أثناء إنشاء الحساب
+
+        // ---------- رسائل الأخطاء ----------
+        function errorText(e) {
+            const map = {
+                'auth/invalid-credential': 'البريد أو كلمة المرور غير صحيحة',
+                'auth/invalid-email': 'صيغة البريد الإلكتروني غير صحيحة',
+                'auth/email-already-in-use': 'هذا البريد مسجل مسبقاً، جرّب تسجيل الدخول',
+                'auth/weak-password': 'كلمة المرور قصيرة، استخدم 6 أحرف على الأقل',
+                'auth/too-many-requests': 'محاولات كثيرة، حاول لاحقاً',
+                'auth/network-request-failed': 'تعذر الاتصال بالإنترنت',
+                'permission-denied': 'ليست لديك صلاحية لهذا الإجراء'
+            };
+            return map[e.code] || 'حدث خطأ، حاول مرة أخرى';
+        }
+
+        // ---------- الدخول وإنشاء الحساب ----------
+        function setMode(register) {
+            registerMode = register;
+            $('nameGroup').classList.toggle('hidden', !register);
+            $('authTitle').textContent = register ? 'إنشاء حساب ولي أمر' : 'تسجيل الدخول - تطبيق المدرسة';
+            $('authBtn').textContent = register ? 'إنشاء الحساب' : 'دخول';
+            $('toggleAuth').textContent = register ? 'لديك حساب؟ سجّل الدخول' : 'ولي أمر جديد؟ أنشئ حساباً';
+            $('password').autocomplete = register ? 'new-password' : 'current-password';
+        }
+        $('toggleAuth').addEventListener('click', () => setMode(!registerMode));
+
+        $('authBtn').addEventListener('click', async () => {
+            const email = $('email').value.trim();
+            const password = $('password').value;
+            const name = $('regName').value.trim();
+            if (!email || !password) { showToast('أدخل البريد وكلمة المرور', true); return; }
+            if (registerMode && !name) { showToast('أدخل اسمك', true); return; }
+            $('authBtn').disabled = true;
+            try {
+                if (registerMode) {
+                    pendingName = name;
+                    await createUserWithEmailAndPassword(auth, email, password);
+                } else {
+                    await signInWithEmailAndPassword(auth, email, password);
+                }
+                $('password').value = '';
+            } catch (e) {
+                pendingName = null;
+                showToast(errorText(e), true);
+            } finally {
+                $('authBtn').disabled = false;
+            }
+        });
+
+        document.querySelectorAll('[data-logout]').forEach(b =>
+            b.addEventListener('click', () => signOut(auth)));
+
+        // ---------- متابعة حالة الدخول ----------
+        onAuthStateChanged(auth, async user => {
+            stopListening();
+            profile = null;
+            if (!user) { show('loginScreen'); return; }
+            try {
+                const ref = doc(db, 'users', user.uid);
+                let snap = await getDoc(ref);
+                if (!snap.exists() && pendingName) {
+                    // حساب جديد: يُنشأ دائماً بصفة ولي أمر
+                    await setDoc(ref, { name: pendingName, email: user.email, role: 'parent' });
+                    snap = await getDoc(ref);
+                }
+                pendingName = null;
+                if (!snap.exists() || !SCREENS[snap.data().role]) {
+                    showToast('حسابك غير مفعّل بعد، تواصل مع إدارة المدرسة', true);
+                    await signOut(auth);
+                    return;
+                }
+                profile = { uid: user.uid, ...snap.data() };
+                document.querySelectorAll('[data-welcome]').forEach(el =>
+                    el.textContent = 'مرحباً ' + profile.name);
+                show(SCREENS[profile.role]);
+                startListening();
+            } catch (e) {
+                showToast(errorText(e), true);
+                await signOut(auth);
+            }
+        });
+
+        // ---------- عرض القوائم ----------
+        function formatDate(d) {
+            return d.toLocaleString('ar', { dateStyle: 'medium', timeStyle: 'short' });
+        }
+        function makeItem(entry, withTitle, canDelete, onDelete) {
+            const div = document.createElement('div');
+            div.className = 'item';
+            const meta = document.createElement('div');
+            meta.className = 'meta';
+            meta.textContent = entry.author + ' • ' + formatDate(entry.date);
+            div.appendChild(meta);
+            if (withTitle) {
+                const title = document.createElement('div');
+                title.className = 'title';
+                title.textContent = entry.title;
+                div.appendChild(title);
+            }
+            const body = document.createElement('div');
+            body.className = 'body';
+            body.textContent = withTitle ? entry.details : entry.text;
+            div.appendChild(body);
+            if (canDelete) {
+                const del = document.createElement('button');
+                del.className = 'delete-btn';
+                del.textContent = 'حذف';
+                del.addEventListener('click', () => onDelete(entry.id));
+                div.appendChild(del);
+            }
+            return div;
+        }
+        function renderList(containerId, list, withTitle, emptyText, canDelete, onDelete) {
+            const box = $(containerId);
+            box.replaceChildren();
+            if (!list.length) {
+                const p = document.createElement('p');
+                p.className = 'empty';
+                p.textContent = emptyText;
+                box.appendChild(p);
+                return;
+            }
+            list.forEach(e => box.appendChild(makeItem(e, withTitle, canDelete(e), onDelete)));
+        }
+        function toEntries(snap) {
+            return snap.docs.map(d => {
+                const data = d.data();
+                return { id: d.id, ...data, date: data.createdAt?.toDate?.() ?? new Date() };
+            });
+        }
+
+        // ---------- الأسئلة والردود ----------
+        function makeQuestionItem(q, canReply) {
+            const div = document.createElement('div');
+            div.className = 'item';
+
+            const badge = document.createElement('span');
+            const answered = q.replies.length > 0;
+            badge.className = 'badge ' + (answered ? 'done' : 'wait');
+            badge.textContent = answered ? 'تم الرد' : 'بانتظار الرد';
+            div.appendChild(badge);
+
+            const meta = document.createElement('div');
+            meta.className = 'meta';
+            meta.textContent = q.author + ' • ' + formatDate(q.date);
+            div.appendChild(meta);
+
+            const body = document.createElement('div');
+            body.className = 'body';
+            body.textContent = q.text;
+            div.appendChild(body);
+
+            q.replies.forEach(r => {
+                const rd = document.createElement('div');
+                rd.className = 'reply';
+                const rm = document.createElement('div');
+                rm.className = 'meta';
+                const label = ROLE_LABELS[r.role] ? ' (' + ROLE_LABELS[r.role] + ')' : '';
+                rm.textContent = r.author + label + ' • ' + formatDate(new Date(r.date));
+                const rb = document.createElement('div');
+                rb.className = 'body';
+                rb.textContent = r.text;
+                rd.append(rm, rb);
+                div.appendChild(rd);
+            });
+
+            if (canReply) {
+                const box = document.createElement('div');
+                box.className = 'reply-box';
+                const input = document.createElement('textarea');
+                input.placeholder = 'اكتب الرد هنا...';
+                const btn = document.createElement('button');
+                btn.className = 'reply-btn';
+                btn.textContent = 'إرسال الرد';
+                btn.addEventListener('click', () => sendReply(q.id, input, btn));
+                box.append(input, btn);
+                div.appendChild(box);
+            }
+            return div;
+        }
+        function renderQuestions(containerId, list, canReply) {
+            const box = $(containerId);
+            box.replaceChildren();
+            if (!list.length) {
+                const p = document.createElement('p');
+                p.className = 'empty';
+                p.textContent = 'لا توجد أسئلة حالياً.';
+                box.appendChild(p);
+                return;
+            }
+            list.forEach(q => box.appendChild(makeQuestionItem(q, canReply)));
+        }
+        function toQuestions(snap) {
+            return toEntries(snap)
+                .map(q => ({ ...q, replies: Array.isArray(q.replies) ? q.replies : [] }))
+                .sort((a, b) => b.date - a.date);
+        }
+        async function sendReply(id, input, btn) {
+            const text = input.value.trim();
+            if (!text) { showToast('اكتب الرد أولاً', true); return; }
+            btn.disabled = true;
+            try {
+                await updateDoc(doc(db, 'questions', id), {
+                    replies: arrayUnion({
+                        text,
+                        author: profile.name,
+                        uid: profile.uid,
+                        role: profile.role,
+                        date: new Date().toISOString()
+                    })
+                });
+                input.value = '';
+                showToast('تم إرسال الرد');
+            } catch (e) {
+                showToast(errorText(e), true);
+            } finally {
+                btn.disabled = false;
+            }
+        }
+
+        // ---------- التحديث الفوري ----------
+        function startListening() {
+            const onErr = e => showToast(errorText(e), true);
+
+            unsubscribers.push(onSnapshot(
+                query(collection(db, 'announcements'), orderBy('createdAt', 'desc')),
+                snap => {
+                    const list = toEntries(snap);
+                    renderList('adminAnnounceList', list, false, 'لم يتم نشر تعاميم بعد.', () => profile.role === 'admin', deleteAnnouncement);
+                    renderList('parentAnnounce', list, false, 'لا توجد تعاميم جديدة.', () => false);
+                }, onErr));
+
+            unsubscribers.push(onSnapshot(
+                query(collection(db, 'homework'), orderBy('createdAt', 'desc')),
+                snap => {
+                    const list = toEntries(snap);
+                    const mine = e => profile.role === 'admin' || e.uid === profile.uid;
+                    renderList('teacherHwList', list, true, 'لم يتم إرسال واجبات بعد.', mine, deleteHomework);
+                    renderList('parentHw', list, true, 'لا توجد واجبات جديدة حالياً.', () => false);
+                }, onErr));
+
+            if (profile.role === 'parent') {
+                // ولي الأمر يرى أسئلته فقط (القواعد تمنع قراءة أسئلة غيره)
+                unsubscribers.push(onSnapshot(
+                    query(collection(db, 'questions'), where('uid', '==', profile.uid)),
+                    snap => renderQuestions('parentQuestions', toQuestions(snap), false),
+                    onErr));
+            } else {
+                // المعلم والمدير يرون كل الأسئلة ويمكنهم الرد
+                const targetId = profile.role === 'admin' ? 'adminQuestions' : 'teacherQuestions';
+                unsubscribers.push(onSnapshot(
+                    query(collection(db, 'questions'), orderBy('createdAt', 'desc')),
+                    snap => renderQuestions(targetId, toQuestions(snap), true),
+                    onErr));
+            }
+        }
+        function stopListening() {
+            unsubscribers.forEach(u => u());
+            unsubscribers = [];
+        }
+
+        // ---------- سؤال ولي الأمر ----------
+        $('sendQBtn').addEventListener('click', async () => {
+            const text = $('qText').value.trim();
+            if (!text) { showToast('الرجاء كتابة السؤال', true); return; }
+            try {
+                await addDoc(collection(db, 'questions'), {
+                    text, author: profile.name, uid: profile.uid, replies: [], createdAt: serverTimestamp()
+                });
+                $('qText').value = '';
+                showToast('تم إرسال السؤال');
+            } catch (e) { showToast(errorText(e), true); }
+        });
+
+        // ---------- التعاميم (المدير) ----------
+        $('sendAnnounceBtn').addEventListener('click', async () => {
+            const text = $('adminMsg').value.trim();
+            if (!text) { showToast('الرجاء كتابة نص التعميم', true); return; }
+            try {
+                await addDoc(collection(db, 'announcements'), {
+                    text, author: profile.name, uid: profile.uid, createdAt: serverTimestamp()
+                });
+                $('adminMsg').value = '';
+                showToast('تم نشر التعميم');
+            } catch (e) { showToast(errorText(e), true); }
+        });
+        async function deleteAnnouncement(id) {
+            if (!confirm('هل تريد حذف هذا التعميم؟')) return;
+            try { await deleteDoc(doc(db, 'announcements', id)); }
+            catch (e) { showToast(errorText(e), true); }
+        }
+
+        // ---------- الواجبات (المعلم) ----------
+        $('sendHwBtn').addEventListener('click', async () => {
+            const title = $('hwTitle').value.trim();
+            const details = $('hwDetails').value.trim();
+            if (!title) { showToast('الرجاء كتابة عنوان الواجب', true); return; }
+            try {
+                await addDoc(collection(db, 'homework'), {
+                    title, details, author: profile.name, uid: profile.uid, createdAt: serverTimestamp()
+                });
+                $('hwTitle').value = '';
+                $('hwDetails').value = '';
+                showToast('تم إرسال الواجب');
+            } catch (e) { showToast(errorText(e), true); }
+        });
+        async function deleteHomework(id) {
+            if (!confirm('هل تريد حذف هذا الواجب؟')) return;
+            try { await deleteDoc(doc(db, 'homework', id)); }
+            catch (e) { showToast(errorText(e), true); }
+        }
+    </script>
+</body>
+</html>
